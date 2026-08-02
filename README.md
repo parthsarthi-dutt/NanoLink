@@ -1,4 +1,4 @@
-# High-Performance URL Shortener
+# NanoLink- A High-Performance URL Shortener
 
 A production-ready URL shortener service built with Go and PostgreSQL, similar to Bitly/TinyURL. This project demonstrates clean architecture, efficient database design, and containerized deployment.
 
