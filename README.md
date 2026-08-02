@@ -1,70 +1,37 @@
-# NanoLink- A High-Performance URL Shortener
+# NanoLink - High-Performance URL Shortener
 
-A production-ready URL shortener service built with Go and PostgreSQL, similar to Bitly/TinyURL. This project demonstrates clean architecture, efficient database design, and containerized deployment.
+NanoLink is a fast, containerized URL shortener written in Go. It uses PostgreSQL for persistent storage and Redis for read-through caching and rate limiting.
 
-## Features
+I built this project to dive deeper into Go concurrency, standard library HTTP routing, and Docker.
 
-- **Redis Read-Through Caching:** Sub-millisecond latency for URL redirection by caching active URLs in RAM.
-- **Rate Limiting:** Protects the API from abuse and DDoS attacks using Redis-backed IP tracking.
-- **Short URL Generation:** Creates random base62 short codes with collision checks.
-- **Custom Aliases:** Supports user-defined custom short URLs.
-- **Click Tracking:** Asynchronous click counting for analytics decoupled from the main redirect flow.
-- **Full CRUD:** Support for fetching, updating, and deleting shortened URLs.
-- **Dockerized:** Fully containerized using Docker and Docker Compose.
+## Architecture
 
-## Tech Stack
+- **Go (`net/http`)**: Core API server.
+- **PostgreSQL**: Stores URL mappings and analytics (clicks).
+- **Redis**: Caches short codes for faster redirects and tracks IP requests to limit abuse.
 
-- **Language:** Go (Golang)
-- **Framework:** Standard Library (`net/http`)
-- **Database:** PostgreSQL (with `database/sql` and `lib/pq`)
-- **Cache & Rate Limiting:** Redis (with `go-redis/v9`)
-- **Deployment:** Docker, Docker Compose
+## Running the project
 
-## Getting Started
+You need Docker and Docker Compose installed.
 
-### Prerequisites
-- Docker and Docker Compose installed on your machine.
-
-### Running the Project
 ```bash
+git clone https://github.com/parthsarthi-dutt/NanoLink.git
+cd NanoLink
 docker-compose up -d --build
 ```
-The service will be available at `http://localhost:8080`.
+The server will start on `http://localhost:8080`.
 
-## API Documentation
+## API Endpoints
 
-### 1. Shorten URL (POST `/api/shorten`)
-**Request Body:**
-```json
-{
-  "original_url": "https://www.example.com",
-  "custom_alias": "myalias"
-}
-```
-**Response:**
-```json
-{
-  "short_url": "http://localhost:8080/myalias"
-}
-```
+- `POST /api/shorten` - Shorten a URL (accepts `original_url` and optional `custom_alias`)
+- `GET /<short_code>` - Redirect to the original URL
+- `GET /api/stats?code=<short_code>` - View click count
+- `GET /api/urls` - Fetch all URLs
+- `PUT /api/urls/update?code=<short_code>` - Update a destination URL
+- `DELETE /api/urls/delete?code=<short_code>` - Delete a short code
 
-### 2. Redirect URL (GET `/<short_code>`)
-Redirects the user to the original URL via a 302 HTTP status code. Also asynchronously increments the click counter.
+## To-Do / Future Improvements
 
-### 3. URL Statistics (GET `/api/stats?code=<short_code>`)
-Returns metadata and click counts for a specific shortened URL.
-
-### 4. Get All URLs (GET `/api/urls`)
-Returns a JSON array of all shortened URLs stored in the system, sorted by creation date.
-
-### 5. Update URL (PUT `/api/urls/update?code=<short_code>`)
-Allows changing the destination (`original_url`) of an existing short code without changing the short link itself.
-**Request Body:**
-```json
-{
-  "original_url": "https://www.new-destination.com"
-}
-```
-
-### 6. Delete URL (DELETE `/api/urls/delete?code=<short_code>`)
-Permanently removes the URL from the system. Future requests to this short link will return a 404 Not Found.
+- Pre-generate Base62 codes via an offline Key Generation Service (KGS) to completely eliminate DB collisions on write.
+- Add OAuth2 for user accounts.
+- Add Prometheus/Grafana metrics.

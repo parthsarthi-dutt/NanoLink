@@ -22,7 +22,6 @@ func getBaseURL() string {
 	return baseURL
 }
 
-// ShortenURLHandler handles the creation of short URLs
 func ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -47,11 +46,9 @@ func ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortCode := req.CustomAlias
 	if shortCode == "" {
-		// Generate a random 6-character short code
 		for {
 			shortCode = utils.GenerateShortCode(6)
 			
-			// Collision check
 			var exists bool
 			err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM urls WHERE short_code=$1)", shortCode).Scan(&exists)
 			if err != nil {
@@ -65,7 +62,6 @@ func ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		// Validate custom alias availability
 		var exists bool
 		err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM urls WHERE short_code=$1)", shortCode).Scan(&exists)
 		if err != nil {
@@ -79,7 +75,6 @@ func ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Insert the URL into the database
 	_, err := database.DB.Exec(
 		"INSERT INTO urls (short_code, original_url, expires_at) VALUES ($1, $2, $3)",
 		shortCode, req.OriginalURL, req.ExpiresAt,
@@ -100,7 +95,6 @@ func ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// RedirectURLHandler handles redirection from short code to original URL
 func RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -117,10 +111,8 @@ func RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 	var originalURL string
 	var expiresAt sql.NullTime
 
-	// Try fetching from Redis Cache First
 	cachedURL, err := database.RedisClient.Get(database.Ctx, "url:"+shortCode).Result()
 	if err == nil && cachedURL != "" {
-		// Cache Hit
 		go func(code string) {
 			_, err := database.DB.Exec("UPDATE urls SET clicks = clicks + 1 WHERE short_code = $1", code)
 			if err != nil {
@@ -131,7 +123,6 @@ func RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cache Miss: Fetch original URL from Database
 	err = database.DB.QueryRow(
 		"SELECT original_url, expires_at FROM urls WHERE short_code=$1", shortCode,
 	).Scan(&originalURL, &expiresAt)
@@ -145,16 +136,13 @@ func RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if URL is expired
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		http.Error(w, "URL has expired", http.StatusGone)
 		return
 	}
 
-	// Save to Redis Cache (Cache it for 1 hour)
 	database.RedisClient.Set(database.Ctx, "url:"+shortCode, originalURL, time.Hour)
 
-	// Increment click counter asynchronously
 	go func(code string) {
 		_, err := database.DB.Exec("UPDATE urls SET clicks = clicks + 1 WHERE short_code = $1", code)
 		if err != nil {
@@ -162,11 +150,9 @@ func RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}(shortCode)
 
-	// Perform redirect
 	http.Redirect(w, r, originalURL, http.StatusFound)
 }
 
-// StatsHandler returns statistics for a given short code
 func StatsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -198,7 +184,6 @@ func StatsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(urlData)
 }
 
-// GetAllURLsHandler returns all URLs in the database
 func GetAllURLsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -227,7 +212,6 @@ func GetAllURLsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(urls)
 }
 
-// UpdateURLHandler allows updating the original_url or expiration for a given short code
 func UpdateURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -272,7 +256,6 @@ func UpdateURLHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"message": "URL updated successfully"}`))
 }
 
-// DeleteURLHandler deletes a URL by its short code
 func DeleteURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -301,7 +284,6 @@ func DeleteURLHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent) // 204 No Content
 }
 
-// HealthCheckHandler verifies that the service is running
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
